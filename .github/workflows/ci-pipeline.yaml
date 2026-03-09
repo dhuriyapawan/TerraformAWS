@@ -1,54 +1,39 @@
-name: CI Pipeline
+name: Build and Push Docker Image to ECR
 
 on:
   push:
     branches:
-            [main]
+      - main  # Trigger on pushes to main branch
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
+    # 1️⃣ Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Checkout code
-        uses: actions/checkout@v3
+    # 2️⃣ Configure AWS credentials
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-north-1
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: us-east-1
+    # 3️⃣ Login to Amazon ECR
+    - name: Login to ECR
+      run: |
+        aws ecr get-login-password --region eu-north-1 \
+        | docker login --username AWS --password-stdin 599548906743.dkr.ecr.eu-north-1.amazonaws.com
 
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region eu-north-1 \
-          |    docker login \
-           --username AWS \
-           --password-stdin 599548906743.dkr.ecr.eu-north-1.amazonaws.com          
+    # 4️⃣ Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t 599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd:latest .
 
-      - name: Build Image
-        run: |
-          docker build -t node-app:${{ github.sha }} .
-
-      - name: Tag Image
-        run: |
-          docker tag node-app:${{ github.sha }} \
-          599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd/:${{ github.sha }}
-
-      - name: Push Image
-        run: |
-          599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd/:${{ github.sha }}
-
-      - name: Update Helm Chart
-        run: |
-          sed -i "s/tag:.*/tag: ${{ github.sha }}/" helm/node-app/values.yaml
-
-      - name: Commit Helm update
-        run: |
-          git config --global user.email "dhuriya.pawan@gmail.com"
-          git config --global user.name "dhuriyapawan"
-          git add .
-          git commit -m "update image tag"
-          git push
+    # 5️⃣ Push Docker image to ECR
+    - name: Push Docker image
+      run: |
+        docker push 599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd:latest
