@@ -1,0 +1,38 @@
+replicaCount: 2
+
+image:
+  repository: myrepo/node-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: nodeapp.example.com
+  path: /
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+livenessProbe:
+  path: /
+  port: 3000
+
+readinessProbe:
+  path: /
+  port: 3000
