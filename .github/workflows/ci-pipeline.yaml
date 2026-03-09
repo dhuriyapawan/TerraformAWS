@@ -1,0 +1,54 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+            [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password \
+          | docker login \
+          --username AWS \
+          --password-stdin 599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd
+
+      - name: Build Image
+        run: |
+          docker build -t node-app:${{ github.sha }} .
+
+      - name: Tag Image
+        run: |
+          docker tag node-app:${{ github.sha }} \
+          599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd/node-app:${{ github.sha }}
+
+      - name: Push Image
+        run: |
+          599548906743.dkr.ecr.eu-north-1.amazonaws.com/argocd/node-app:${{ github.sha }}
+
+      - name: Update Helm Chart
+        run: |
+          sed -i "s/tag:.*/tag: ${{ github.sha }}/" helm/node-app/values.yaml
+
+      - name: Commit Helm update
+        run: |
+          git config --global user.email "dhuriya.pawan@gmail.com"
+          git config --global user.name "dhuriyapawan"
+          git add .
+          git commit -m "update image tag"
+          git push
